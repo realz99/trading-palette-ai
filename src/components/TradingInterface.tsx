@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,8 @@ export const TradingInterface = () => {
   const [takeProfit3, setTakeProfit3] = useState("");
   const [chartSymbol, setChartSymbol] = useState("XAUUSD");
   const [currentPrice, setCurrentPrice] = useState(0);
+  const [isChartLoaded, setIsChartLoaded] = useState(false);
+  const [hasActivePositions, setHasActivePositions] = useState(false);
   const { toast } = useToast();
   
   const parseInstruction = (text: string) => {
@@ -118,39 +120,68 @@ export const TradingInterface = () => {
     };
   };
 
-  const updateChartOverlay = (data: any) => {
-    const chart = (window as any).tradingView?.chart;
-    if (!chart || !data) return;
+  const updateChartOverlay = useCallback((data: any) => {
+    if (!isChartLoaded || !data) return;
 
-    chart.removeAllShapes();
+    const widget = (window as any).TradingView?.widget;
+    if (!widget) return;
 
-    if (data.entryMin) {
-      chart.createShape({
-        type: 'horizontal_line',
-        price: data.entryMin,
-        text: 'Entry',
-        color: data.direction === 'BUY' ? '#4CAF50' : '#F44336'
+    try {
+      widget.chart().removeAllShapes();
+
+      if (data.entryMin) {
+        widget.chart().createShape({
+          type: 'horizontal_line',
+          price: data.entryMin,
+          text: 'Entry',
+          color: data.direction === 'BUY' ? '#4CAF50' : '#F44336',
+          textColor: '#ffffff',
+          disableUndo: false,
+        });
+      }
+
+      if (data.stop) {
+        widget.chart().createShape({
+          type: 'horizontal_line',
+          price: data.stop,
+          text: 'SL',
+          color: '#FF5252',
+          textColor: '#ffffff',
+          disableUndo: false,
+        });
+      }
+
+      data.targets.forEach((tp: number, index: number) => {
+        widget.chart().createShape({
+          type: 'horizontal_line',
+          price: tp,
+          text: `TP${index + 1}`,
+          color: '#4CAF50',
+          textColor: '#ffffff',
+          disableUndo: false,
+        });
       });
+    } catch (error) {
+      console.error("Error drawing chart overlays:", error);
+    }
+  }, [isChartLoaded]);
+
+  const initializeChart = useCallback(() => {
+    const widget = (window as any).TradingView?.widget;
+    if (!widget) {
+      console.log("TradingView widget not found, retrying...");
+      setTimeout(initializeChart, 1000);
+      return;
     }
 
-    if (data.stop) {
-      chart.createShape({
-        type: 'horizontal_line',
-        price: data.stop,
-        text: 'SL',
-        color: '#FF5252'
-      });
-    }
-
-    data.targets.forEach((tp: number, index: number) => {
-      chart.createShape({
-        type: 'horizontal_line',
-        price: tp,
-        text: `TP${index + 1}`,
-        color: '#4CAF50'
-      });
+    widget.onChartReady(() => {
+      console.log("Chart is ready");
+      setIsChartLoaded(true);
+      if (parsedData) {
+        updateChartOverlay(parsedData);
+      }
     });
-  };
+  }, [parsedData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +195,14 @@ export const TradingInterface = () => {
   };
 
   const killAllPositions = () => {
+    if (!hasActivePositions) {
+      toast({
+        title: "No Active Positions",
+        description: "There are no positions to close",
+        variant: "default"
+      });
+      return;
+    }
     toast({
       title: "Closing All Positions",
       description: "All active positions are being closed",
@@ -171,6 +210,14 @@ export const TradingInterface = () => {
   };
 
   const reversePositions = () => {
+    if (!hasActivePositions) {
+      toast({
+        title: "No Active Positions",
+        description: "There are no positions to reverse",
+        variant: "default"
+      });
+      return;
+    }
     toast({
       title: "Reversing Positions",
       description: "All positions are being reversed",
@@ -178,6 +225,14 @@ export const TradingInterface = () => {
   };
 
   const closeAllProfits = () => {
+    if (!hasActivePositions) {
+      toast({
+        title: "No Active Positions",
+        description: "There are no profitable positions to close",
+        variant: "default"
+      });
+      return;
+    }
     toast({
       title: "Closing Profitable Positions",
       description: "All positions in profit are being closed",
@@ -185,6 +240,14 @@ export const TradingInterface = () => {
   };
 
   const closeAllLosses = () => {
+    if (!hasActivePositions) {
+      toast({
+        title: "No Active Positions",
+        description: "There are no positions in loss to close",
+        variant: "default"
+      });
+      return;
+    }
     toast({
       title: "Closing Loss Positions",
       description: "All positions in loss are being closed",
@@ -195,8 +258,10 @@ export const TradingInterface = () => {
     const iframe = document.querySelector('iframe');
     if (iframe) {
       iframe.src = `https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`;
+      setIsChartLoaded(false);
+      setTimeout(initializeChart, 1000);
     }
-  }, [chartSymbol]);
+  }, [chartSymbol, initializeChart]);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6 animate-fadeIn">
@@ -226,31 +291,38 @@ export const TradingInterface = () => {
                   placeholder="Symbol"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={killAllPositions}>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Kill All
-                </Button>
-                <Button variant="outline" size="sm" onClick={reversePositions}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Reverse
-                </Button>
-                <Button variant="outline" size="sm" onClick={closeAllProfits}>
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  Close Profits
-                </Button>
-                <Button variant="outline" size="sm" onClick={closeAllLosses}>
-                  <Ban className="w-4 h-4 mr-2" />
-                  Close Losses
-                </Button>
-              </div>
+              {hasActivePositions && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={killAllPositions}>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Kill All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={reversePositions}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reverse
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={closeAllProfits}>
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Close Profits
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={closeAllLosses}>
+                    <Ban className="w-4 h-4 mr-2" />
+                    Close Losses
+                  </Button>
+                </div>
+              )}
             </div>
-            <div className="aspect-[16/9] bg-muted/30 rounded-lg">
+            <div className="aspect-[16/9] bg-muted/30 rounded-lg relative">
               <iframe
                 src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`}
                 style={{ width: "100%", height: "100%" }}
                 className="rounded-lg"
               />
+              {!isChartLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              )}
             </div>
           </Card>
 
