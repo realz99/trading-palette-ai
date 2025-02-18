@@ -48,11 +48,39 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
   }
+
+  /* High Contrast Theme for Dyslexic Users */
+  .high-contrast {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 95%;
+    --card-foreground: 0 0% 0%;
+    --primary: 200 100% 35%;
+    --secondary: 45 100% 50%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 30%;
+  }
+
+  /* Soft Theme for Users with Autism */
+  .soft {
+    --background: 180 20% 99%;
+    --foreground: 200 30% 20%;
+    --card: 180 20% 97%;
+    --card-foreground: 200 30% 20%;
+    --primary: 200 50% 60%;
+    --secondary: 150 30% 60%;
+    --muted: 180 20% 94%;
+    --muted-foreground: 200 30% 40%;
+  }
 }
 
 @layer utilities {
   .glass-morphism {
     @apply backdrop-blur-xl bg-white/5 border border-white/10;
+  }
+
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
   }
 }
 
@@ -62,5 +90,22 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Improved Readability for Dyslexic Users */
+  .dyslexic-friendly {
+    font-family: "OpenDyslexic", system-ui, sans-serif;
+    line-height: 1.8;
+    letter-spacing: 0.1em;
+  }
+
+  /* Reduced Motion for Users with Autism */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
