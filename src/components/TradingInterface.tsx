@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -35,27 +34,36 @@ export const TradingInterface = () => {
   const [takeProfit1, setTakeProfit1] = useState("");
   const [takeProfit2, setTakeProfit2] = useState("");
   const [takeProfit3, setTakeProfit3] = useState("");
+  const [chartSymbol, setChartSymbol] = useState("XAUUSD");
+  const [currentPrice, setCurrentPrice] = useState(0);
   const { toast } = useToast();
   
   const parseInstruction = (text: string) => {
     try {
-      // Enhanced parsing with support for multiple TP levels
       const symbolMatch = text.match(/([A-Z]{6}|XAUUSD)/i);
       const directionMatch = text.toLowerCase().includes("buy") ? "BUY" : "SELL";
       const entryMatch = text.match(/@(\d+\.?\d*)-?(\d+\.?\d*)?/);
       const stopMatch = text.match(/sl:?\s*(\d+\.?\d*)/i);
-      const targetsMatch = text.match(/targets?:?\s*((?:\d+\.?\d*\s*-?\s*)*)/i);
-
+      
+      const targetsPattern = /targets?:?\s*((?:\d+\.?\d*(?:\s*-\s*)?)+)/i;
+      const targetsMatch = text.match(targetsPattern);
+      
       let targets: string[] = [];
       if (targetsMatch && targetsMatch[1]) {
         targets = targetsMatch[1]
-          .trim()
-          .split(/\s*-\s*/)
-          .filter(t => t);
+          .split(/[-\s]+/)
+          .map(t => t.trim())
+          .filter(t => t && !isNaN(parseFloat(t)));
+      }
+
+      const symbol = symbolMatch ? symbolMatch[0].toUpperCase() : "";
+      
+      if (symbol && symbol !== chartSymbol) {
+        setChartSymbol(symbol);
       }
 
       const parsed = {
-        symbol: symbolMatch ? symbolMatch[0].toUpperCase() : "",
+        symbol,
         direction: directionMatch,
         entryMin: entryMatch ? parseFloat(entryMatch[1]) : null,
         entryMax: entryMatch && entryMatch[2] ? parseFloat(entryMatch[2]) : null,
@@ -77,16 +85,45 @@ export const TradingInterface = () => {
     }
   };
 
+  const calculatePipValue = (symbol: string, lotSize: number = 1) => {
+    const pipValues: { [key: string]: number } = {
+      XAUUSD: 0.1,
+      EURUSD: 0.0001,
+      GBPUSD: 0.0001,
+      USDJPY: 0.01,
+    };
+    return pipValues[symbol] || 0.0001;
+  };
+
+  const calculateRisk = () => {
+    if (!parsedData || !currentPrice) return { maxPosition: "0.00", riskAmount: "0.00" };
+    
+    const balance = 10000;
+    const riskAmount = (balance * Number(riskPercent)) / 100;
+    const pipValue = calculatePipValue(parsedData.symbol);
+    
+    const entryPrice = parsedData.entryMin || currentPrice;
+    const stopLossPips = parsedData.stop ? 
+      Math.abs(entryPrice - parsedData.stop) / pipValue : 
+      0;
+    
+    if (stopLossPips === 0) return { maxPosition: "0.00", riskAmount: "0.00" };
+    
+    const leverageMultiplier = Math.min(Number(leverage), 1500);
+    const leveragedPosition = (riskAmount / stopLossPips) * leverageMultiplier;
+    
+    return {
+      maxPosition: leveragedPosition.toFixed(2),
+      riskAmount: riskAmount.toFixed(2)
+    };
+  };
+
   const updateChartOverlay = (data: any) => {
-    // This function would update the TradingView chart with overlays
-    // Using TradingView's API to draw lines for entry, SL, and TPs
     const chart = (window as any).tradingView?.chart;
     if (!chart || !data) return;
 
-    // Clear existing drawings
     chart.removeAllShapes();
 
-    // Draw entry zone
     if (data.entryMin) {
       chart.createShape({
         type: 'horizontal_line',
@@ -96,7 +133,6 @@ export const TradingInterface = () => {
       });
     }
 
-    // Draw stop loss
     if (data.stop) {
       chart.createShape({
         type: 'horizontal_line',
@@ -106,7 +142,6 @@ export const TradingInterface = () => {
       });
     }
 
-    // Draw take profits
     data.targets.forEach((tp: number, index: number) => {
       chart.createShape({
         type: 'horizontal_line',
@@ -128,31 +163,11 @@ export const TradingInterface = () => {
     }
   };
 
-  const calculateRisk = () => {
-    if (!parsedData) return { maxPosition: "0.00", riskAmount: "0.00" };
-    
-    const balance = 10000; // Example balance
-    const riskAmount = (balance * Number(riskPercent)) / 100;
-    const pipValue = 0.1; // Example pip value, should be calculated based on symbol
-    const stopLossPips = parsedData.stop ? 
-      Math.abs(parsedData.entryMin - parsedData.stop) / pipValue : 
-      0;
-    
-    const leveragedPosition = (riskAmount / stopLossPips) * Number(leverage);
-    
-    return {
-      maxPosition: leveragedPosition.toFixed(2),
-      riskAmount: riskAmount.toFixed(2)
-    };
-  };
-
-  // Trading control functions
   const killAllPositions = () => {
     toast({
       title: "Closing All Positions",
       description: "All active positions are being closed",
     });
-    // MT5 integration code would go here
   };
 
   const reversePositions = () => {
@@ -160,7 +175,6 @@ export const TradingInterface = () => {
       title: "Reversing Positions",
       description: "All positions are being reversed",
     });
-    // MT5 integration code would go here
   };
 
   const closeAllProfits = () => {
@@ -168,7 +182,6 @@ export const TradingInterface = () => {
       title: "Closing Profitable Positions",
       description: "All positions in profit are being closed",
     });
-    // MT5 integration code would go here
   };
 
   const closeAllLosses = () => {
@@ -176,13 +189,18 @@ export const TradingInterface = () => {
       title: "Closing Loss Positions",
       description: "All positions in loss are being closed",
     });
-    // MT5 integration code would go here
   };
+
+  useEffect(() => {
+    const iframe = document.querySelector('iframe');
+    if (iframe) {
+      iframe.src = `https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`;
+    }
+  }, [chartSymbol]);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6 animate-fadeIn">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Connection Status */}
         <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -197,10 +215,17 @@ export const TradingInterface = () => {
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Chart Section */}
           <Card className="col-span-2 p-6 backdrop-blur-sm bg-card/50 border border-border/50">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Market Overview</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold">Market Overview</h2>
+                <Input
+                  value={chartSymbol}
+                  onChange={(e) => setChartSymbol(e.target.value.toUpperCase())}
+                  className="w-32"
+                  placeholder="Symbol"
+                />
+              </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={killAllPositions}>
                   <XCircle className="w-4 h-4 mr-2" />
@@ -222,14 +247,13 @@ export const TradingInterface = () => {
             </div>
             <div className="aspect-[16/9] bg-muted/30 rounded-lg">
               <iframe
-                src="https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=EURUSD&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange"
+                src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`}
                 style={{ width: "100%", height: "100%" }}
                 className="rounded-lg"
               />
             </div>
           </Card>
 
-          {/* Trading Controls */}
           <div className="space-y-6">
             <Card className="p-6 backdrop-blur-sm bg-card/50 border border-border/50">
               <h2 className="text-lg font-semibold mb-4">Trading Controls</h2>
@@ -352,7 +376,6 @@ export const TradingInterface = () => {
               </Tabs>
             </Card>
 
-            {/* Parsed Data Display */}
             {parsedData && (
               <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
                 <h3 className="text-sm font-medium mb-2">Parsed Instructions</h3>
@@ -391,7 +414,6 @@ export const TradingInterface = () => {
           </div>
         </div>
 
-        {/* Risk Management */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-6 backdrop-blur-sm bg-card/50 border border-border/50">
             <h2 className="text-lg font-semibold mb-4">Risk Calculator</h2>
@@ -424,7 +446,7 @@ export const TradingInterface = () => {
                 <Input 
                   type="number"
                   min="1"
-                  max="1000"
+                  max="1500"
                   step="1"
                   value={leverage}
                   onChange={(e) => setLeverage(e.target.value)}
@@ -432,6 +454,16 @@ export const TradingInterface = () => {
                 />
               </div>
               <div className="space-y-2">
+                <label className="text-xs">Current Price</label>
+                <Input 
+                  type="number"
+                  step="0.00001"
+                  value={currentPrice}
+                  onChange={(e) => setCurrentPrice(Number(e.target.value))}
+                  placeholder="Enter current price"
+                />
+              </div>
+              <div className="col-span-2 space-y-2">
                 <label className="text-xs">Max Position</label>
                 <div className="h-10 px-3 py-2 rounded-md border bg-muted/30 flex items-center">
                   {calculateRisk().maxPosition}
@@ -440,7 +472,6 @@ export const TradingInterface = () => {
             </div>
           </Card>
 
-          {/* Order Status */}
           <Card className="p-6 backdrop-blur-sm bg-card/50 border border-border/50">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Order Status</h2>
