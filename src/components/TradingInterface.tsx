@@ -6,20 +6,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calculator,
-  BarChart3,
   ArrowUpDown,
   AlertCircle,
   Signal,
   Lock,
   Eye,
   Target,
-  BarChart,
   Settings,
   XCircle,
   RotateCcw,
   Ban,
   DollarSign,
-  Trash2
 } from "lucide-react";
 
 export const TradingInterface = () => {
@@ -339,305 +336,147 @@ export const TradingInterface = () => {
   useEffect(() => {
     const iframe = document.querySelector('iframe');
     if (iframe) {
-      iframe.src = `https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`;
+      iframe.src = `https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`;
       setIsChartLoaded(false);
       setTimeout(initializeChart, 1000);
     }
   }, [chartSymbol, initializeChart]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 animate-fadeIn">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Signal className="w-4 h-4 text-trading-profit" />
-              <span className="text-sm font-medium">MT5 Connected</span>
-            </div>
-            <Button variant="outline" size="sm">
-              <Settings className="w-4 h-4 mr-2" />
-              Connection Settings
-            </Button>
-          </div>
-        </Card>
+    <div className="min-h-screen bg-background text-foreground p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-2rem)]">
+        <div className="lg:col-span-3 relative">
+          <iframe
+            src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`}
+            className="w-full h-full rounded-lg"
+          />
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="col-span-2 p-6 backdrop-blur-sm bg-card/50 border border-border/50">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-lg font-semibold">Market Overview</h2>
-                <Input
-                  value={chartSymbol}
-                  onChange={(e) => setChartSymbol(e.target.value.toUpperCase())}
-                  className="w-32"
-                  placeholder="Symbol"
-                />
+        <div className="space-y-4">
+          <Card className="p-3 backdrop-blur-sm bg-card/50 border border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Signal className="w-4 h-4 text-green-500" />
+                <span className="text-sm">MT5 Connected</span>
               </div>
-              {hasActivePositions && (
-                <div className="flex gap-2">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
+            <Tabs defaultValue="ai" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="ai">AI Trading</TabsTrigger>
+                <TabsTrigger value="manual">Manual</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="ai" className="space-y-4">
+                <Input
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  placeholder="e.g., Buy XAUUSD @1900 SL:1880 TP:1920"
+                  className="text-sm"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button size="sm" onClick={() => parseInstruction(instruction)}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Parse
+                  </Button>
+                  <Button size="sm" variant="secondary">
+                    <Lock className="w-4 h-4 mr-2" />
+                    Execute
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="manual" className="space-y-3">
+                <div className="grid gap-2">
+                  <Input placeholder="Entry Price" size="sm" type="number" step="0.00001" />
+                  <Input placeholder="Stop Loss" size="sm" type="number" step="0.00001" />
+                  <Input placeholder="Take Profit" size="sm" type="number" step="0.00001" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="default" size="sm">Buy</Button>
+                    <Button variant="destructive" size="sm">Sell</Button>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </Card>
+
+          <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Risk Calculator</h3>
+                <Calculator className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Input 
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={positionSize}
+                    onChange={(e) => setPositionSize(e.target.value)}
+                    placeholder="Lot Size"
+                    className="text-sm h-8"
+                  />
+                </div>
+                <div>
+                  <Input 
+                    type="number"
+                    min="0.1"
+                    max="5"
+                    step="0.1"
+                    value={riskPercent}
+                    onChange={(e) => setRiskPercent(e.target.value)}
+                    placeholder="Risk %"
+                    className="text-sm h-8"
+                  />
+                </div>
+              </div>
+              <Input 
+                type="number"
+                min="1"
+                max="1500"
+                step="1"
+                value={leverage}
+                onChange={(e) => setLeverage(e.target.value)}
+                placeholder="Leverage"
+                className="text-sm h-8"
+              />
+              <div className="bg-muted/30 rounded p-2 text-sm">
+                Max Position: {calculateRisk().maxPosition}
+              </div>
+            </div>
+          </Card>
+
+          {hasActivePositions && (
+            <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium mb-2">Position Management</h3>
+                <div className="grid grid-cols-2 gap-2">
                   <Button variant="outline" size="sm" onClick={killAllPositions}>
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Kill All
+                    <XCircle className="w-4 h-4 mr-1" />
+                    Close All
                   </Button>
                   <Button variant="outline" size="sm" onClick={reversePositions}>
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                    <RotateCcw className="w-4 h-4 mr-1" />
                     Reverse
                   </Button>
                   <Button variant="outline" size="sm" onClick={closeAllProfits}>
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Close Profits
+                    <DollarSign className="w-4 h-4 mr-1" />
+                    Take Profit
                   </Button>
                   <Button variant="outline" size="sm" onClick={closeAllLosses}>
-                    <Ban className="w-4 h-4 mr-2" />
-                    Close Losses
+                    <Ban className="w-4 h-4 mr-1" />
+                    Cut Loss
                   </Button>
                 </div>
-              )}
-            </div>
-            <div className="aspect-[16/9] bg-muted/30 rounded-lg relative">
-              <iframe
-                src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`}
-                style={{ width: "100%", height: "100%" }}
-                className="rounded-lg"
-              />
-              {!isChartLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <div className="space-y-6">
-            <Card className="p-6 backdrop-blur-sm bg-card/50 border border-border/50">
-              <h2 className="text-lg font-semibold mb-4">Trading Controls</h2>
-              <Tabs defaultValue="ai" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="ai">AI Trading</TabsTrigger>
-                  <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="ai" className="space-y-4">
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Trading Instruction
-                      </label>
-                      <Input
-                        value={instruction}
-                        onChange={(e) => setInstruction(e.target.value)}
-                        placeholder="e.g., Buy XAUUSD @1900-1895 SL:1880 Targets: 1910-1920-1930"
-                        className="bg-background/50"
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button className="flex-1" type="submit">
-                        <Eye className="w-4 h-4 mr-2" />
-                        Parse
-                      </Button>
-                      <Button className="flex-1" type="button" disabled={!parsedData}>
-                        <Lock className="w-4 h-4 mr-2" />
-                        Confirm
-                      </Button>
-                    </div>
-                  </form>
-                </TabsContent>
-                
-                <TabsContent value="manual" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs">Symbol</label>
-                      <Input placeholder="XAUUSD" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Type</label>
-                      <select 
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={orderType}
-                        onChange={(e) => setOrderType(e.target.value)}
-                      >
-                        <option value="market">Market</option>
-                        <option value="limit">Limit</option>
-                        <option value="stop">Stop</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Entry Price</label>
-                      <Input 
-                        type="number"
-                        value={entryPrice}
-                        onChange={(e) => setEntryPrice(e.target.value)}
-                        placeholder="0.00"
-                        step="0.00001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Stop Loss</label>
-                      <Input 
-                        type="number"
-                        value={stopLoss}
-                        onChange={(e) => setStopLoss(e.target.value)}
-                        placeholder="0.00"
-                        step="0.00001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Take Profit 1</label>
-                      <Input 
-                        type="number"
-                        value={takeProfit1}
-                        onChange={(e) => setTakeProfit1(e.target.value)}
-                        placeholder="0.00"
-                        step="0.00001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Take Profit 2</label>
-                      <Input 
-                        type="number"
-                        value={takeProfit2}
-                        onChange={(e) => setTakeProfit2(e.target.value)}
-                        placeholder="0.00"
-                        step="0.00001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Take Profit 3</label>
-                      <Input 
-                        type="number"
-                        value={takeProfit3}
-                        onChange={(e) => setTakeProfit3(e.target.value)}
-                        placeholder="0.00"
-                        step="0.00001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs">Volume</label>
-                      <Input 
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        placeholder="0.01"
-                      />
-                    </div>
-                  </div>
-                  <Button className="w-full">
-                    <Target className="w-4 h-4 mr-2" />
-                    Place Manual Order
-                  </Button>
-                </TabsContent>
-              </Tabs>
+              </div>
             </Card>
-
-            {parsedData && (
-              <Card className="p-4 backdrop-blur-sm bg-card/50 border border-border/50">
-                <h3 className="text-sm font-medium mb-2">Parsed Instructions</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Symbol:</span>
-                    <span className="font-medium">{parsedData.symbol}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Direction:</span>
-                    <span className="font-medium">{parsedData.direction}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Entry Zone:</span>
-                    <span className="font-medium">
-                      {parsedData.entryMin}
-                      {parsedData.entryMax ? ` - ${parsedData.entryMax}` : ''}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Stop Loss:</span>
-                    <span className="font-medium">{parsedData.stop}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground">Take Profit Levels:</span>
-                    {parsedData.targets.map((target: number, index: number) => (
-                      <div key={index} className="flex justify-between pl-4">
-                        <span className="text-muted-foreground">TP{index + 1}:</span>
-                        <span className="font-medium">{target}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6 backdrop-blur-sm bg-card/50 border border-border/50">
-            <h2 className="text-lg font-semibold mb-4">Risk Calculator</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs">Position Size</label>
-                <Input 
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={positionSize}
-                  onChange={(e) => setPositionSize(e.target.value)}
-                  placeholder="0.01"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs">Risk %</label>
-                <Input 
-                  type="number"
-                  min="0.1"
-                  max="5"
-                  step="0.1"
-                  value={riskPercent}
-                  onChange={(e) => setRiskPercent(e.target.value)}
-                  placeholder="1"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs">Leverage</label>
-                <Input 
-                  type="number"
-                  min="1"
-                  max="1500"
-                  step="1"
-                  value={leverage}
-                  onChange={(e) => setLeverage(e.target.value)}
-                  placeholder="100"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs">Current Price</label>
-                <Input 
-                  type="number"
-                  step="0.00001"
-                  value={currentPrice}
-                  onChange={(e) => setCurrentPrice(Number(e.target.value))}
-                  placeholder="Enter current price"
-                />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <label className="text-xs">Max Position</label>
-                <div className="h-10 px-3 py-2 rounded-md border bg-muted/30 flex items-center">
-                  {calculateRisk().maxPosition}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 backdrop-blur-sm bg-card/50 border border-border/50">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Order Status</h2>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <AlertCircle className="w-4 h-4 mr-2" />
-                Demo Mode
-              </div>
-            </div>
-            <div className="bg-muted/30 rounded-lg p-4 text-center">
-              <p className="text-muted-foreground">No active orders</p>
-            </div>
-          </Card>
+          )}
         </div>
       </div>
     </div>
