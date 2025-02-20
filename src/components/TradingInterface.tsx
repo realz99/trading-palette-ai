@@ -22,9 +22,9 @@ import {
 export const TradingInterface = () => {
   const [instruction, setInstruction] = useState("");
   const [parsedData, setParsedData] = useState<any>(null);
-  const [positionSize, setPositionSize] = useState("0.01");
-  const [riskPercent, setRiskPercent] = useState("1");
-  const [leverage, setLeverage] = useState("100");
+  const [positionSize, setPositionSize] = useState(0.01);
+  const [riskPercent, setRiskPercent] = useState(1);
+  const [leverage, setLeverage] = useState(100);
   const [orderType, setOrderType] = useState("market");
   const [entryPrice, setEntryPrice] = useState("");
   const [stopLoss, setStopLoss] = useState("");
@@ -36,7 +36,7 @@ export const TradingInterface = () => {
   const [isChartLoaded, setIsChartLoaded] = useState(false);
   const [hasActivePositions, setHasActivePositions] = useState(false);
   const { toast } = useToast();
-  
+
   const parseInstruction = (text: string) => {
     try {
       const symbolMatch = text.match(/([A-Z]{6}|XAUUSD)/i);
@@ -333,6 +333,18 @@ export const TradingInterface = () => {
     }
   };
 
+  const handlePositionSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPositionSize(parseFloat(e.target.value) || 0.01);
+  };
+
+  const handleRiskPercentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRiskPercent(parseFloat(e.target.value) || 1);
+  };
+
+  const handleLeverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLeverage(parseFloat(e.target.value) || 100);
+  };
+
   useEffect(() => {
     const iframe = document.querySelector('iframe');
     if (iframe) {
@@ -346,10 +358,13 @@ export const TradingInterface = () => {
     <div className="min-h-screen bg-background text-foreground p-4">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-2rem)]">
         <div className="lg:col-span-3 relative">
-          <iframe
-            src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`}
-            className="w-full h-full rounded-lg"
-          />
+          <div className="w-full h-full overflow-hidden">
+            <iframe
+              src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${chartSymbol}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=exchange`}
+              className="w-full h-full rounded-lg"
+              style={{ aspectRatio: "16/9", minHeight: "calc(100vh - 2rem)" }}
+            />
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -412,29 +427,25 @@ export const TradingInterface = () => {
                 <Calculator className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Input 
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={positionSize}
-                    onChange={(e) => setPositionSize(e.target.value)}
-                    placeholder="Lot Size"
-                    className="text-sm h-8"
-                  />
-                </div>
-                <div>
-                  <Input 
-                    type="number"
-                    min="0.1"
-                    max="5"
-                    step="0.1"
-                    value={riskPercent}
-                    onChange={(e) => setRiskPercent(e.target.value)}
-                    placeholder="Risk %"
-                    className="text-sm h-8"
-                  />
-                </div>
+                <Input 
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={positionSize}
+                  onChange={handlePositionSizeChange}
+                  placeholder="Lot Size"
+                  className="text-sm h-8"
+                />
+                <Input 
+                  type="number"
+                  min="0.1"
+                  max="5"
+                  step="0.1"
+                  value={riskPercent}
+                  onChange={handleRiskPercentChange}
+                  placeholder="Risk %"
+                  className="text-sm h-8"
+                />
               </div>
               <Input 
                 type="number"
@@ -442,7 +453,7 @@ export const TradingInterface = () => {
                 max="1500"
                 step="1"
                 value={leverage}
-                onChange={(e) => setLeverage(e.target.value)}
+                onChange={handleLeverageChange}
                 placeholder="Leverage"
                 className="text-sm h-8"
               />
