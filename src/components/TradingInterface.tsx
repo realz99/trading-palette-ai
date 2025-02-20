@@ -47,15 +47,47 @@ export const TradingInterface = () => {
       const entryMatch = text.match(/@(\d+\.?\d*)-?(\d+\.?\d*)?/);
       const stopMatch = text.match(/sl:?\s*(\d+\.?\d*)/i);
       
+      const allTargets: number[] = [];
+      
       const targetsPattern = /targets?:?\s*((?:\d+\.?\d*(?:\s*-\s*)?)+)/i;
       const targetsMatch = text.match(targetsPattern);
       
-      let targets: string[] = [];
       if (targetsMatch && targetsMatch[1]) {
-        targets = targetsMatch[1]
+        const mainTargets = targetsMatch[1]
           .split(/[-\s]+/)
           .map(t => t.trim())
-          .filter(t => t && !isNaN(parseFloat(t)));
+          .filter(t => t && !isNaN(parseFloat(t)))
+          .map(t => parseFloat(t));
+        allTargets.push(...mainTargets);
+      }
+
+      const extendedPattern = /range:\s*((?:\d+\.?\d*(?:\s*-\s*)?)+)/i;
+      const extendedMatch = text.match(extendedPattern);
+      
+      if (extendedMatch && extendedMatch[1]) {
+        const extendedTargets = extendedMatch[1]
+          .split(/[-\s]+/)
+          .map(t => t.trim())
+          .filter(t => t && !isNaN(parseFloat(t)))
+          .map(t => parseFloat(t));
+        allTargets.push(...extendedTargets);
+      }
+
+      const remainingNumbers = text.match(/\b\d+\.?\d*\b/g);
+      if (remainingNumbers) {
+        const parsedNumbers = remainingNumbers
+          .map(n => parseFloat(n))
+          .filter(n => {
+            const isEntry = entryMatch && (n === parseFloat(entryMatch[1]) || (entryMatch[2] && n === parseFloat(entryMatch[2])));
+            const isStop = stopMatch && n === parseFloat(stopMatch[1]);
+            return !isEntry && !isStop;
+          });
+        
+        parsedNumbers.forEach(n => {
+          if (!allTargets.includes(n)) {
+            allTargets.push(n);
+          }
+        });
       }
 
       const symbol = symbolMatch ? symbolMatch[0].toUpperCase() : "";
@@ -70,11 +102,28 @@ export const TradingInterface = () => {
         entryMin: entryMatch ? parseFloat(entryMatch[1]) : null,
         entryMax: entryMatch && entryMatch[2] ? parseFloat(entryMatch[2]) : null,
         stop: stopMatch ? parseFloat(stopMatch[1]) : null,
-        targets: targets.map(t => parseFloat(t)),
+        targets: allTargets,
+      };
+
+      const mt5Order = {
+        command: directionMatch === "BUY" ? "TRADE_ACTION_DEAL" : "TRADE_ACTION_SELL",
+        symbol: symbol,
+        volume: parseFloat(positionSize),
+        type: parsed.entryMax ? "ORDER_TYPE_BUY_LIMIT" : "ORDER_TYPE_BUY_STOP",
+        price: parsed.entryMin || currentPrice,
+        sl: parsed.stop,
+        tp: allTargets[0],
+        comment: `Auto order with ${allTargets.length} TP levels`,
+        type_filling: "ORDER_FILLING_FOK",
+        type_time: "ORDER_TIME_GTC",
+        deviation: 10
       };
 
       setParsedData(parsed);
       updateChartOverlay(parsed);
+
+      console.log("MT5 Order Format:", mt5Order);
+
       return parsed;
     } catch (error) {
       console.error("Parsing error:", error);
@@ -252,6 +301,39 @@ export const TradingInterface = () => {
       title: "Closing Loss Positions",
       description: "All positions in loss are being closed",
     });
+  };
+
+  const sendToMT5 = async (order: any) => {
+    try {
+      const request = {
+        action: "TRADE_ACTION_DEAL",
+        symbol: order.symbol,
+        volume: order.volume,
+        type: order.type,
+        price: order.price,
+        sl: order.sl,
+        tp: order.tp,
+        deviation: order.deviation,
+        magic: 123456,
+        comment: order.comment,
+        type_filling: order.type_filling,
+        type_time: order.type_time
+      };
+
+      console.log("Sending order to MT5:", request);
+      
+      toast({
+        title: "Order Sent to MT5",
+        description: `${order.symbol} ${order.command} order submitted`,
+      });
+    } catch (error) {
+      console.error("MT5 order error:", error);
+      toast({
+        title: "MT5 Order Error",
+        description: "Failed to send order to MT5",
+        variant: "destructive"
+      });
+    }
   };
 
   useEffect(() => {
