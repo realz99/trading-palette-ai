@@ -22,9 +22,9 @@ import {
 export const TradingInterface = () => {
   const [instruction, setInstruction] = useState("");
   const [parsedData, setParsedData] = useState<any>(null);
-  const [positionSize, setPositionSize] = useState(0.01);
-  const [riskPercent, setRiskPercent] = useState(1);
-  const [leverage, setLeverage] = useState(100);
+  const [positionSize, setPositionSize] = useState<number>(0.01);
+  const [riskPercent, setRiskPercent] = useState<number>(1);
+  const [leverage, setLeverage] = useState<number>(100);
   const [orderType, setOrderType] = useState("market");
   const [entryPrice, setEntryPrice] = useState("");
   const [stopLoss, setStopLoss] = useState("");
@@ -36,6 +36,18 @@ export const TradingInterface = () => {
   const [isChartLoaded, setIsChartLoaded] = useState(false);
   const [hasActivePositions, setHasActivePositions] = useState(false);
   const { toast } = useToast();
+
+  const handleParse = () => {
+    console.log("Parsing instruction:", instruction);
+    const parsed = parseInstruction(instruction);
+    if (parsed) {
+      toast({
+        title: "Order Parsed Successfully",
+        description: `${parsed.direction} ${parsed.symbol} with ${parsed.targets.length} TP levels`,
+      });
+      console.log("Parsed data:", parsed);
+    }
+  };
 
   const parseInstruction = (text: string) => {
     try {
@@ -77,14 +89,9 @@ export const TradingInterface = () => {
           .filter(n => {
             const isEntry = entryMatch && (n === parseFloat(entryMatch[1]) || (entryMatch[2] && n === parseFloat(entryMatch[2])));
             const isStop = stopMatch && n === parseFloat(stopMatch[1]);
-            return !isEntry && !isStop;
+            return !isEntry && !isStop && !allTargets.includes(n);
           });
-        
-        parsedNumbers.forEach(n => {
-          if (!allTargets.includes(n)) {
-            allTargets.push(n);
-          }
-        });
+        allTargets.push(...parsedNumbers);
       }
 
       const symbol = symbolMatch ? symbolMatch[0].toUpperCase() : "";
@@ -102,10 +109,14 @@ export const TradingInterface = () => {
         targets: allTargets,
       };
 
+      console.log("Parsed data:", parsed);
+      setParsedData(parsed);
+
+      // Create MT5 order format
       const mt5Order = {
         command: directionMatch === "BUY" ? "TRADE_ACTION_DEAL" : "TRADE_ACTION_SELL",
         symbol: symbol,
-        volume: parseFloat(positionSize),
+        volume: positionSize,
         type: parsed.entryMax ? "ORDER_TYPE_BUY_LIMIT" : "ORDER_TYPE_BUY_STOP",
         price: parsed.entryMin || currentPrice,
         sl: parsed.stop,
@@ -116,11 +127,7 @@ export const TradingInterface = () => {
         deviation: 10
       };
 
-      setParsedData(parsed);
-      updateChartOverlay(parsed);
-
       console.log("MT5 Order Format:", mt5Order);
-
       return parsed;
     } catch (error) {
       console.error("Parsing error:", error);
@@ -395,7 +402,7 @@ export const TradingInterface = () => {
                   className="text-sm"
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <Button size="sm" onClick={() => parseInstruction(instruction)}>
+                  <Button size="sm" onClick={handleParse}>
                     <Eye className="w-4 h-4 mr-2" />
                     Parse
                   </Button>
@@ -404,6 +411,15 @@ export const TradingInterface = () => {
                     Execute
                   </Button>
                 </div>
+                {parsedData && (
+                  <div className="bg-muted/30 rounded p-2 text-xs space-y-1">
+                    <div>Symbol: {parsedData.symbol}</div>
+                    <div>Direction: {parsedData.direction}</div>
+                    <div>Entry: {parsedData.entryMin}{parsedData.entryMax ? ` - ${parsedData.entryMax}` : ''}</div>
+                    <div>Stop Loss: {parsedData.stop}</div>
+                    <div>Targets: {parsedData.targets.join(', ')}</div>
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="manual" className="space-y-3">
